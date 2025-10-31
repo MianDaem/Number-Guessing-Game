@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Number Guess Game 🎯</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-indigo-600 to-purple-700 min-h-screen flex items-center justify-center p-4 text-white">
+  <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-8 max-w-md w-full shadow-2xl text-center">
+    <h1 class="text-3xl font-bold mb-6">🎯 Number Guess Game</h1>
+
+    <!-- Error Display -->
+    <p id="error-msg" class="text-red-400 mb-4 hidden">⚠️ Backend not connected</p>
+
+    <!-- Difficulty -->
+    <div id="difficulty-screen">
+      <p class="mb-4 text-lg">Choose difficulty:</p>
+      <div class="flex justify-center gap-3">
+        <button class="difficulty bg-green-500 px-4 py-2 rounded-lg" data-level="easy">Easy</button>
+        <button class="difficulty bg-yellow-500 px-4 py-2 rounded-lg" data-level="medium">Medium</button>
+        <button class="difficulty bg-red-500 px-4 py-2 rounded-lg" data-level="hard">Hard</button>
+      </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="hidden">
+      <p id="range-text" class="mb-2"></p>
+      <p id="tries-text" class="mb-3"></p>
+      <input id="guess" type="number" class="text-black p-2 rounded-lg w-full mb-3 text-center" placeholder="Enter your guess" />
+      <button id="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 py-2 rounded-lg font-semibold">Submit</button>
+      <p id="feedback" class="mt-4 text-lg"></p>
+    </div>
+  </div>
+
+  <script>
+    const api = "http://127.0.0.1:5000";  // Flask backend address
+    let gameId = null;
+    let tries = 0;
+
+    const diffBtns = document.querySelectorAll('.difficulty');
+    const diffScreen = document.getElementById('difficulty-screen');
+    const gameScreen = document.getElementById('game-screen');
+    const rangeText = document.getElementById('range-text');
+    const triesText = document.getElementById('tries-text');
+    const feedback = document.getElementById('feedback');
+    const errorMsg = document.getElementById('error-msg');
+
+    diffBtns.forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const level = btn.dataset.level;
+        try {
+          const res = await fetch(`${api}/start`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ difficulty: level })
+          });
+          if (!res.ok) throw new Error('Backend not connected');
+          const data = await res.json();
+
+          gameId = data.game_id;
+          diffScreen.classList.add('hidden');
+          gameScreen.classList.remove('hidden');
+          rangeText.textContent = `Guess a number between ${data.low} and ${data.high}`;
+          triesText.textContent = `You have ${data.max_tries} guesses.`;
+          feedback.textContent = '';
+          errorMsg.classList.add('hidden');
+        } catch (err) {
+          errorMsg.classList.remove('hidden');
+          console.error('Backend not connected.');
+        }
+      });
+    });
+
+    document.getElementById('submit').addEventListener('click', async () => {
+      const guess = document.getElementById('guess').value;
+      if (!guess || !gameId) return;
+
+      try {
+        const res = await fetch(`${api}/guess`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ game_id: gameId, guess })
+        });
+        if (!res.ok) throw new Error('Backend not connected');
+        const data = await res.json();
+
+        if (data.result === "win") {
+          feedback.textContent = `🎉 You won! Score: ${data.score}`;
+        } else if (data.result === "lose") {
+          feedback.textContent = `😞 Out of guesses! The number was ${data.secret}`;
+        } else {
+          feedback.textContent = `Try ${data.hint}! You're ${data.closeness}. ${data.remaining} guesses left.`;
+        }
+      } catch (err) {
+        errorMsg.classList.remove('hidden');
+        feedback.textContent = '';
+      }
+    });
+  </script>
+</body>
+</html>
